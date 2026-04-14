@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getRoom, saveRoom, deleteRoom } from './store.js';
-import { buildDeck, dealCards, getValidCards } from './gameLogic.js';
+import { buildDeck, dealCards, getValidCards, shuffle } from './gameLogic.js';
 
 // ─── GENERATE ROOM CODE ───────────────────────────────────────────────────────
 function generateCode() {
@@ -179,7 +179,7 @@ export async function playCard(code, playerId, cardId, chosenColor = null) {
       if (room.deck.length === 0) {
         // Reshuffle
         const top = room.discard.pop();
-        room.deck = shuffleArr([...room.discard]);
+        room.deck = shuffle([...room.discard]);
         room.discard = [top];
       }
       if (room.deck.length > 0) nextPlayer.hand.push(room.deck.shift());
@@ -209,7 +209,7 @@ export async function drawCard(code, playerId) {
   if (room.deck.length === 0) {
     if (room.discard.length <= 1) return { error: 'No cards left' };
     const top = room.discard.pop();
-    room.deck = shuffleArr([...room.discard]);
+    room.deck = shuffle([...room.discard]);
     room.discard = [top];
   }
 
@@ -227,8 +227,6 @@ export async function drawCard(code, playerId) {
 
 // ─── DISCONNECT PLAYER ────────────────────────────────────────────────────────
 export async function disconnectPlayer(socketId) {
-  // We need to find room by socketId — scan all rooms
-  // (In prod you'd keep a socketId→roomCode map for efficiency)
   const { getAllRooms, saveRoom: save, deleteRoom: del } = await import('./store.js');
   const rooms = await getAllRooms();
 
@@ -254,11 +252,4 @@ export async function disconnectPlayer(socketId) {
   return null;
 }
 
-function shuffleArr(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
+

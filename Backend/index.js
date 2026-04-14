@@ -7,7 +7,6 @@ import {
   createRoom, joinRoom, rejoinRoom,
   startGame, playCard, drawCard, disconnectPlayer
 } from './roomManager.js';
-import { getRoom } from './store.js';
 import { getValidCards } from './gameLogic.js';
 
 const app = express();

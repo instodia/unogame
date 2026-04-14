@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import socket from '../socket';
-import Card from '../components/Card';
-import ColorPicker from '../components/ColorPicker';
+import socket from './socket';
+import Card from './Card';
+import ColorPicker from './ColorPicker';
 import './Game.css';
 
 const COLOR_BG = { red: '#E8192C', blue: '#0057B8', green: '#00A651', yellow: '#FFD700', wild: '#1a1a2e' };

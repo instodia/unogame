@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import socket from '../socket';
+import socket from './socket';
 import './Lobby.css';
 
 export default function Lobby() {

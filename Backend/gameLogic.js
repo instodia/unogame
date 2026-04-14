@@ -60,7 +60,7 @@ export function dealCards(deck, playerCount, cardsEach = 7) {
   let startCard = deck.shift();
   while (startCard.color === 'wild') {
     deck.push(startCard);
-    deck = shuffle(deck);
+    shuffle(deck);
     startCard = deck.shift();
   }
 
