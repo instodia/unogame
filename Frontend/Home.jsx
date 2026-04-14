@@ -6,7 +6,7 @@ import './Home.css';
 function generateUserId() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 10; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
@@ -14,7 +14,9 @@ function generateUserId() {
 
 function getOrCreateUserId() {
   let userId = localStorage.getItem('uno_user_id');
-  if (!userId || userId.length !== 8) {
+  if (!userId || userId.length !== 10) {
+    localStorage.removeItem('uno_user_id');
+    localStorage.removeItem('uno_player_id');
     userId = generateUserId();
     localStorage.setItem('uno_user_id', userId);
   }
@@ -69,7 +71,7 @@ export default function Home() {
     socket.emit('create_room', { playerName: name.trim(), userId }, (res) => {
       setLoading(false);
       if (res.error) return setError(res.error);
-      localStorage.setItem('uno_player_id', res.playerId);
+      localStorage.setItem('uno_player_id', userId);
       localStorage.setItem('uno_room_code', res.code);
       localStorage.setItem('uno_player_name', name.trim());
       navigate(`/lobby/${res.code}`);
@@ -83,7 +85,7 @@ export default function Home() {
     socket.emit('join_room', { playerName: name.trim(), code: code.trim().toUpperCase(), userId }, (res) => {
       setLoading(false);
       if (res.error) return setError(res.error);
-      localStorage.setItem('uno_player_id', res.playerId);
+      localStorage.setItem('uno_player_id', userId);
       localStorage.setItem('uno_room_code', res.code);
       localStorage.setItem('uno_player_name', name.trim());
       navigate(`/lobby/${res.code}`);

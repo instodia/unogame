@@ -3,7 +3,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import socket from './socket';
 import './Lobby.css';
 
-const API_URL = import.meta.env.VITE_BACKEND_URL || '';
+function getApiUrl() {
+  const envUrl = import.meta.env.VITE_BACKEND_URL;
+  if (envUrl) return envUrl;
+  if (window.location.hostname === 'localhost') return 'http://localhost:3001';
+  return window.location.origin.replace(/:\d+$/, ':3001');
+}
+
+const API_URL = getApiUrl();
 
 export default function Lobby() {
   const { code } = useParams();
@@ -16,7 +23,8 @@ export default function Lobby() {
   const [roomNotFound, setRoomNotFound] = useState(false);
   const socketSetup = useRef(false);
 
-  const myId = localStorage.getItem('uno_player_id');
+  const storedId = localStorage.getItem('uno_user_id');
+  const myId = (storedId && storedId.length === 10) ? storedId : null;
 
   useEffect(() => {
     let mounted = true;
@@ -24,6 +32,8 @@ export default function Lobby() {
     const validateAndJoin = async () => {
       try {
         const res = await fetch(`${API_URL}/api/room/${code}`);
+        if (!res.ok) throw new Error('API error');
+        
         const data = await res.json();
 
         if (!mounted) return;
@@ -43,7 +53,9 @@ export default function Lobby() {
         setupSocket();
       } catch (e) {
         console.error('Room validation error:', e);
-        if (mounted) setupSocket();
+        if (mounted) {
+          setupSocket();
+        }
       }
     };
 
@@ -57,7 +69,7 @@ export default function Lobby() {
             if (!mounted) return;
             setIsLoading(false);
             if (res?.error) {
-              setError('Unable to rejoin room. You may need to rejoin.');
+              setError('Unable to rejoin room. Please rejoin.');
             }
           });
         }
@@ -86,12 +98,6 @@ export default function Lobby() {
       } else {
         socket.connect();
       }
-
-      return () => {
-        socket.off('connect', handleConnect);
-        socket.off('lobby_state', handleLobbyState);
-        socket.off('game_state', handleGameState);
-      };
     };
 
     validateAndJoin();

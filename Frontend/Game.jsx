@@ -25,7 +25,8 @@ export default function Game() {
   const cardRefs = useRef({});
   const hasRejoined = useRef(false);
 
-  const myId = localStorage.getItem('uno_player_id');
+  const storedId = localStorage.getItem('uno_user_id');
+  const myId = (storedId && storedId.length === 10) ? storedId : null;
   const me = gameState?.players.find(p => p.id === myId);
   const isMyTurn = gameState?.players[gameState.currentPlayerIndex]?.id === myId;
 
