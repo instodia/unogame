@@ -28,6 +28,24 @@ const io = new Server(httpServer, {
 app.get('/', (req, res) => res.json({ status: 'UNO server running 🃏' }));
 app.get('/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
 
+// ─── ROOM CHECK ─────────────────────────────────────────────────────────────
+app.get('/api/room/:code', async (req, res) => {
+  try {
+    const room = await getRoom(req.params.code.toUpperCase());
+    if (!room) {
+      return res.json({ exists: false });
+    }
+    return res.json({ 
+      exists: true, 
+      status: room.status,
+      playerCount: room.players.length 
+    });
+  } catch (e) {
+    console.error('Room check error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 // Build public game state (no opponent hands revealed)

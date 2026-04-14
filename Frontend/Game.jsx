@@ -19,23 +19,38 @@ export default function Game() {
   const [showChat, setShowChat] = useState(false);
   const [animatingCard, setAnimatingCard] = useState(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [rejoining, setRejoining] = useState(true);
   const chatEndRef = useRef(null);
   const discardRef = useRef(null);
   const cardRefs = useRef({});
+  const hasRejoined = useRef(false);
 
   const myId = localStorage.getItem('uno_player_id');
   const me = gameState?.players.find(p => p.id === myId);
   const isMyTurn = gameState?.players[gameState.currentPlayerIndex]?.id === myId;
 
   useEffect(() => {
-    const handleConnect = () => {
+    const rejoinRoom = () => {
       const pid = localStorage.getItem('uno_player_id');
-      if (pid) socket.emit('rejoin_room', { code, playerId: pid }, () => {});
+      if (!pid) {
+        setRejoining(false);
+        return;
+      }
+
+      socket.emit('rejoin_room', { code, playerId: pid }, (res) => {
+        setRejoining(false);
+        if (res?.error) navigate('/');
+      });
+    };
+
+    const handleConnect = () => {
+      rejoinRoom();
     };
 
     socket.on('connect', handleConnect);
     socket.on('game_state', (state) => {
       setGameState(state);
+      setRejoining(false);
       if (state.status === 'finished') setError('');
     });
     socket.on('lobby_state', () => navigate(`/lobby/${code}`));
@@ -47,11 +62,13 @@ export default function Game() {
       setChat(prev => [...prev, { playerName: '🔌 System', message: `${playerName} left the game`, ts: Date.now() }]);
     });
 
-    const pid = localStorage.getItem('uno_player_id');
-    if (pid) {
-      socket.emit('rejoin_room', { code, playerId: pid }, (res) => {
-        if (res?.error) navigate('/');
-      });
+    if (!socket.connected) {
+      socket.connect();
+    } else {
+      if (!hasRejoined.current) {
+        hasRejoined.current = true;
+        rejoinRoom();
+      }
     }
 
     return () => {
@@ -157,11 +174,11 @@ export default function Game() {
     setChatInput('');
   };
 
-  if (!gameState) {
+  if (!gameState || rejoining) {
     return (
       <div className="game-loading">
         <div className="loader" />
-        <p>Connecting to game...</p>
+        <p>{rejoining ? 'Reconnecting...' : 'Connecting to game...'}</p>
       </div>
     );
   }

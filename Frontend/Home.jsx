@@ -90,6 +90,10 @@ export default function Home() {
   return (
     <div className="home">
       <div className="home-bg" />
+      <div className="user-id-badge">
+        <span className="user-id-label">ID:</span>
+        <span className="user-id-value">{userId}</span>
+      </div>
       <div className="home-content">
         <div className="logo-area">
           <h1 className="logo">UNO</h1>
