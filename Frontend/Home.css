@@ -96,6 +96,55 @@
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field label { font-size: 0.82rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
 
+.code-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.code-input {
+  letter-spacing: 4px !important;
+  font-weight: 800 !important;
+  font-size: 1.2rem !important;
+  padding-right: 44px !important;
+}
+
+.code-input-wrapper.read-only .code-input {
+  background: rgba(0, 166, 81, 0.15) !important;
+  border-color: rgba(0, 166, 81, 0.4) !important;
+  color: var(--green) !important;
+}
+
+.code-clear-btn {
+  position: absolute;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.2s;
+}
+
+.code-clear-btn:hover {
+  background: rgba(232, 25, 44, 0.2);
+  border-color: var(--red);
+  color: var(--red);
+  transform: none;
+}
+
+.code-hint {
+  font-size: 0.78rem;
+  color: var(--green);
+  margin-top: 4px;
+}
+
 .err {
   background: rgba(232,25,44,0.12);
   border: 1px solid rgba(232,25,44,0.3);

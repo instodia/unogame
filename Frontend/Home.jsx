@@ -1,16 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import socket from './socket';
 import './Home.css';
 
+function generateUserId() {
+  return 'user_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
+
+function getOrCreateUserId() {
+  let userId = localStorage.getItem('uno_user_id');
+  if (!userId) {
+    userId = generateUserId();
+    localStorage.setItem('uno_user_id', userId);
+  }
+  return userId;
+}
+
 export default function Home() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState('create'); // 'create' | 'join'
+  const location = useLocation();
+  const [tab, setTab] = useState('create');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [connected, setConnected] = useState(socket.connected);
+  const [codeFromUrl, setCodeFromUrl] = useState('');
+  const [userId] = useState(getOrCreateUserId);
 
   useEffect(() => {
     const onConnect = () => setConnected(true);
@@ -20,16 +36,37 @@ export default function Home() {
     return () => { socket.off('connect', onConnect); socket.off('disconnect', onDisconnect); };
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const roomCode = params.get('roomcode');
+    if (roomCode) {
+      const validCode = roomCode.trim().toUpperCase();
+      if (validCode.length === 6) {
+        setTab('join');
+        setCode(validCode);
+        setCodeFromUrl(validCode);
+      }
+    }
+  }, [location.search]);
+
+  const handleClearCode = () => {
+    setCode('');
+    setCodeFromUrl('');
+    const params = new URLSearchParams(location.search);
+    params.delete('roomcode');
+    const newUrl = window.location.pathname + (params.toString() ? `?${params.toString()}` : '');
+    window.history.replaceState({}, '', newUrl);
+  };
+
   const handleCreate = () => {
     if (!name.trim()) return setError('Enter your name');
     setLoading(true); setError('');
-    socket.emit('create_room', { playerName: name.trim() }, (res) => {
+    socket.emit('create_room', { playerName: name.trim(), userId }, (res) => {
       setLoading(false);
       if (res.error) return setError(res.error);
-      // Save session
-      sessionStorage.setItem('uno_player_id', res.playerId);
-      sessionStorage.setItem('uno_room_code', res.code);
-      sessionStorage.setItem('uno_player_name', name.trim());
+      localStorage.setItem('uno_player_id', res.playerId);
+      localStorage.setItem('uno_room_code', res.code);
+      localStorage.setItem('uno_player_name', name.trim());
       navigate(`/lobby/${res.code}`);
     });
   };
@@ -38,15 +75,17 @@ export default function Home() {
     if (!name.trim()) return setError('Enter your name');
     if (!code.trim()) return setError('Enter room code');
     setLoading(true); setError('');
-    socket.emit('join_room', { playerName: name.trim(), code: code.trim().toUpperCase() }, (res) => {
+    socket.emit('join_room', { playerName: name.trim(), code: code.trim().toUpperCase(), userId }, (res) => {
       setLoading(false);
       if (res.error) return setError(res.error);
-      sessionStorage.setItem('uno_player_id', res.playerId);
-      sessionStorage.setItem('uno_room_code', res.code);
-      sessionStorage.setItem('uno_player_name', name.trim());
+      localStorage.setItem('uno_player_id', res.playerId);
+      localStorage.setItem('uno_room_code', res.code);
+      localStorage.setItem('uno_player_name', name.trim());
       navigate(`/lobby/${res.code}`);
     });
   };
+
+  const isCodeReadOnly = !!codeFromUrl;
 
   return (
     <div className="home">
@@ -86,14 +125,25 @@ export default function Home() {
             {tab === 'join' && (
               <div className="field">
                 <label>Room Code</label>
-                <input
-                  value={code}
-                  onChange={e => setCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. ABC123"
-                  maxLength={6}
-                  style={{ letterSpacing: '4px', fontWeight: 800, fontSize: '1.2rem' }}
-                  onKeyDown={e => e.key === 'Enter' && handleJoin()}
-                />
+                <div className={`code-input-wrapper ${isCodeReadOnly ? 'read-only' : ''}`}>
+                  <input
+                    value={code}
+                    onChange={e => !isCodeReadOnly && setCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. ABC123"
+                    maxLength={6}
+                    readOnly={isCodeReadOnly}
+                    className="code-input"
+                    onKeyDown={e => e.key === 'Enter' && !isCodeReadOnly && handleJoin()}
+                  />
+                  {isCodeReadOnly && (
+                    <button className="code-clear-btn" onClick={handleClearCode} title="Remove room code">
+                      ✕
+                    </button>
+                  )}
+                </div>
+                {isCodeReadOnly && (
+                  <p className="code-hint">You were invited to join this room</p>
+                )}
               </div>
             )}
 
@@ -102,7 +152,7 @@ export default function Home() {
             <button
               className="btn-primary"
               onClick={tab === 'create' ? handleCreate : handleJoin}
-              disabled={loading || !connected}
+              disabled={loading || !connected || (isCodeReadOnly && !code.trim())}
             >
               {loading ? 'Loading...' : tab === 'create' ? '🎲 Create Room' : '🚪 Join Room'}
             </button>

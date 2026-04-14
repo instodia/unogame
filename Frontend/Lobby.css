@@ -32,6 +32,29 @@
 .copy-btn:hover { background: rgba(255,255,255,0.14); transform: none; }
 .room-hint { font-size: 0.8rem; color: var(--text-muted); }
 
+.btn-invite {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--blue), #004080);
+  color: white;
+  padding: 14px 20px;
+  font-size: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 87, 184, 0.4);
+  transition: all 0.2s;
+}
+
+.btn-invite:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(0, 87, 184, 0.5);
+  transform: translateY(-2px);
+}
+
+.btn-invite svg {
+  flex-shrink: 0;
+}
+
 .players-section h3 { font-size: 1rem; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
 
 .players-list { display: flex; flex-direction: column; gap: 8px; }

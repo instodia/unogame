@@ -41,6 +41,7 @@ function buildPublicState(room, forPlayerId) {
     direction: room.direction,
     pendingDraw: room.pendingDraw,
     winner: room.winner,
+    gameEndReason: room.gameEndReason || null,
     lastAction: room.lastAction,
     deckSize: room.deck.length,
     currentPlayerIndex: room.currentPlayerIndex,
@@ -51,9 +52,7 @@ function buildPublicState(room, forPlayerId) {
       cardCount: p.hand.length,
       isHost: p.id === room.hostId,
       isCurrent: i === room.currentPlayerIndex,
-      // Only send hand to the owner
       hand: p.id === forPlayerId ? p.hand : undefined,
-      // Valid cards only for current player
       validCards: (p.id === forPlayerId && i === room.currentPlayerIndex)
         ? getValidCards(p.hand, topCard, room.currentColor).map(c => c.id)
         : undefined,
@@ -87,10 +86,10 @@ io.on('connection', (socket) => {
   console.log(`🔌 Socket connected: ${socket.id}`);
 
   // ── CREATE ROOM ──────────────────────────────────────────────────────────────
-  socket.on('create_room', async ({ playerName }, cb) => {
+  socket.on('create_room', async ({ playerName, userId }, cb) => {
     try {
       if (!playerName?.trim()) return cb({ error: 'Name required' });
-      const { room, playerId } = await createRoom(playerName.trim(), socket.id);
+      const { room, playerId } = await createRoom(playerName.trim(), socket.id, userId);
       socket.join(room.code);
       socket.data = { roomCode: room.code, playerId };
       emitLobbyState(room);
@@ -105,10 +104,10 @@ io.on('connection', (socket) => {
   });
 
   // ── JOIN ROOM ────────────────────────────────────────────────────────────────
-  socket.on('join_room', async ({ code, playerName }, cb) => {
+  socket.on('join_room', async ({ code, playerName, userId }, cb) => {
     try {
       if (!code?.trim() || !playerName?.trim()) return cb({ error: 'Code and name required' });
-      const result = await joinRoom(code.trim().toUpperCase(), playerName.trim(), socket.id);
+      const result = await joinRoom(code.trim().toUpperCase(), playerName.trim(), socket.id, userId);
       if (result.error) return cb({ error: result.error });
 
       const { room, playerId } = result;

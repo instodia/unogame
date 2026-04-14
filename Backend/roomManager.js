@@ -11,14 +11,14 @@ function generateCode() {
 }
 
 // ─── CREATE ROOM ──────────────────────────────────────────────────────────────
-export async function createRoom(playerName, socketId) {
+export async function createRoom(playerName, socketId, userId) {
   const code = generateCode();
-  const playerId = uuidv4();
+  const playerId = userId || uuidv4();
 
   const room = {
     code,
     hostId: playerId,
-    status: 'lobby', // 'lobby' | 'playing' | 'finished'
+    status: 'lobby',
     players: [
       { id: playerId, name: playerName, socketId, hand: [], connected: true }
     ],
@@ -38,7 +38,7 @@ export async function createRoom(playerName, socketId) {
 }
 
 // ─── JOIN ROOM ────────────────────────────────────────────────────────────────
-export async function joinRoom(code, playerName, socketId) {
+export async function joinRoom(code, playerName, socketId, userId) {
   const room = await getRoom(code);
   if (!room) return { error: 'Room not found' };
   if (room.status !== 'lobby') return { error: 'Game already started' };
@@ -47,7 +47,7 @@ export async function joinRoom(code, playerName, socketId) {
   const nameTaken = room.players.some(p => p.name.toLowerCase() === playerName.toLowerCase());
   if (nameTaken) return { error: 'Name already taken in this room' };
 
-  const playerId = uuidv4();
+  const playerId = userId || uuidv4();
   room.players.push({
     id: playerId, name: playerName, socketId, hand: [], connected: true
   });
@@ -256,9 +256,10 @@ export async function leaveGame(code, playerId) {
     if (room.players.length === 1) {
       room.status = 'finished';
       room.winner = { id: room.players[0].id, name: room.players[0].name };
-      room.lastAction = `${playerName} left. ${room.players[0].name} wins!`;
+      room.gameEndReason = 'all_left';
+      room.lastAction = `All other players left the game.`;
       await saveRoom(room);
-      return { room, playerName, roomDeleted: false };
+      return { room, playerName, roomDeleted: false, allLeft: true };
     }
 
     if (wasCurrentPlayer) {

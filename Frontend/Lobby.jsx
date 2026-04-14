@@ -9,13 +9,13 @@ export default function Lobby() {
   const [lobby, setLobby] = useState(null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
-  const myId = sessionStorage.getItem('uno_player_id');
+  const myId = localStorage.getItem('uno_player_id');
 
   useEffect(() => {
-    // Rejoin on reconnect
     const handleConnect = () => {
-      const pid = sessionStorage.getItem('uno_player_id');
+      const pid = localStorage.getItem('uno_player_id');
       if (pid) socket.emit('rejoin_room', { code, playerId: pid }, () => {});
     };
 
@@ -25,11 +25,10 @@ export default function Lobby() {
       if (state.status === 'playing') navigate(`/game/${code}`);
     });
 
-    // Try rejoin if already have session
     if (!socket.connected) {
       socket.connect();
     } else {
-      const pid = sessionStorage.getItem('uno_player_id');
+      const pid = localStorage.getItem('uno_player_id');
       if (pid) socket.emit('rejoin_room', { code, playerId: pid }, (res) => {
         if (res?.error) setError(res.error);
       });
@@ -54,6 +53,13 @@ export default function Lobby() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const copyInviteLink = () => {
+    const inviteUrl = `${window.location.origin}/?roomcode=${code}`;
+    navigator.clipboard.writeText(inviteUrl);
+    setInviteCopied(true);
+    setTimeout(() => setInviteCopied(false), 2000);
+  };
+
   const isHost = lobby?.hostId === myId;
 
   return (
@@ -71,6 +77,30 @@ export default function Lobby() {
           </div>
           <span className="room-hint">Share this code with friends</span>
         </div>
+
+        {isHost && (
+          <button className="btn-invite" onClick={copyInviteLink}>
+            {inviteCopied ? (
+              <>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Link Copied!
+              </>
+            ) : (
+              <>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="18" cy="5" r="3"/>
+                  <circle cx="6" cy="12" r="3"/>
+                  <circle cx="18" cy="19" r="3"/>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                </svg>
+                Invite Friends
+              </>
+            )}
+          </button>
+        )}
 
         <div className="players-section">
           <h3>Players {lobby ? `(${lobby.players.length}/4)` : ''}</h3>

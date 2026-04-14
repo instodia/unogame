@@ -23,13 +23,13 @@ export default function Game() {
   const discardRef = useRef(null);
   const cardRefs = useRef({});
 
-  const myId = sessionStorage.getItem('uno_player_id');
+  const myId = localStorage.getItem('uno_player_id');
   const me = gameState?.players.find(p => p.id === myId);
   const isMyTurn = gameState?.players[gameState.currentPlayerIndex]?.id === myId;
 
   useEffect(() => {
     const handleConnect = () => {
-      const pid = sessionStorage.getItem('uno_player_id');
+      const pid = localStorage.getItem('uno_player_id');
       if (pid) socket.emit('rejoin_room', { code, playerId: pid }, () => {});
     };
 
@@ -47,7 +47,7 @@ export default function Game() {
       setChat(prev => [...prev, { playerName: '🔌 System', message: `${playerName} left the game`, ts: Date.now() }]);
     });
 
-    const pid = sessionStorage.getItem('uno_player_id');
+    const pid = localStorage.getItem('uno_player_id');
     if (pid) {
       socket.emit('rejoin_room', { code, playerId: pid }, (res) => {
         if (res?.error) navigate('/');
@@ -83,9 +83,6 @@ export default function Game() {
     if (cardEl && discardEl) {
       const cardRect = cardEl.getBoundingClientRect();
       const discardRect = discardEl.getBoundingClientRect();
-      
-      const deltaX = discardRect.left + discardRect.width / 2 - cardRect.left - cardRect.width / 2;
-      const deltaY = discardRect.top + discardRect.height / 2 - cardRect.top - cardRect.height / 2;
       
       setAnimatingCard({
         card,
@@ -148,9 +145,8 @@ export default function Game() {
 
   const handleExit = () => {
     socket.emit('leave_game', {}, () => {
-      sessionStorage.removeItem('uno_player_id');
-      sessionStorage.removeItem('uno_room_code');
-      sessionStorage.removeItem('uno_player_name');
+      localStorage.removeItem('uno_room_code');
+      localStorage.removeItem('uno_player_name');
       navigate('/');
     });
   };
@@ -171,13 +167,26 @@ export default function Game() {
   }
 
   if (gameState.status === 'finished') {
+    const allLeft = gameState.gameEndReason === 'all_left';
+    
     return (
       <div className="game-over">
         <div className="game-over-card">
-          <div className="trophy">🏆</div>
-          <h1>{gameState.winner?.name} Wins!</h1>
-          <p>Congratulations!</p>
-          <button className="btn-primary" onClick={() => navigate('/')}>Play Again</button>
+          {allLeft ? (
+            <>
+              <div className="game-ended-icon">👋</div>
+              <h1>Game Ended</h1>
+              <p>All other players left the game.</p>
+              <button className="btn-primary" onClick={() => navigate('/')}>Exit to Home</button>
+            </>
+          ) : (
+            <>
+              <div className="trophy">🏆</div>
+              <h1>{gameState.winner?.name} Wins!</h1>
+              <p>Congratulations!</p>
+              <button className="btn-primary" onClick={() => navigate('/')}>Play Again</button>
+            </>
+          )}
         </div>
       </div>
     );
@@ -211,6 +220,11 @@ export default function Game() {
           <polyline points="16 17 21 12 16 7"/>
           <line x1="21" y1="12" x2="9" y2="12"/>
         </svg>
+      </button>
+
+      <button className="chat-btn" onClick={() => setShowChat(s => !s)} title="Chat">
+        💬
+        {chat.length > 0 && !showChat && <span className="chat-badge">{chat.length}</span>}
       </button>
 
       <div className="opponents-area">
@@ -285,9 +299,6 @@ export default function Game() {
         </div>
         <div className="hand-info">
           <span>{me?.hand?.length ?? 0} cards</span>
-          <button className="chat-toggle" onClick={() => setShowChat(s => !s)}>
-            💬 Chat {chat.length > 0 && !showChat && <span className="chat-dot" />}
-          </button>
         </div>
       </div>
 
