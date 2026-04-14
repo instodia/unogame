@@ -20,6 +20,16 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+* {
+  -webkit-tap-highlight-color: transparent;
+  -moz-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 html, body, #root {
   height: 100%;
   font-family: 'Nunito', sans-serif;

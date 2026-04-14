@@ -444,24 +444,17 @@
 }
 
 /* ─── CARD ANIMATION ─────────────────────────────────────────────────────── */
-.animating-card {
-  position: fixed;
-  top: var(--start-y);
-  left: var(--start-x);
-  z-index: 200;
+.animating-card-wrapper {
   pointer-events: none;
-  animation: throwCard 0.4s ease-out forwards;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
-@keyframes throwCard {
-  0% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(var(--delta-x), var(--delta-y)) rotate(var(--rotation)) scale(0.9);
-    opacity: 0.8;
-  }
+.animating-card-wrapper .card {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
 }
 
 /* ─── CHAT PANEL ─────────────────────────────────────────────────────────── */

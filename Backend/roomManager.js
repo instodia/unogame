@@ -298,14 +298,8 @@ export async function disconnectPlayer(socketId) {
         const newHost = room.players.find(p => p.connected);
         if (newHost) room.hostId = newHost.id;
       }
-      if (room.status === 'playing' && room.players.filter(p => p.connected).length === 1) {
-        room.status = 'finished';
-        const winner = room.players.find(p => p.connected);
-        if (winner) {
-          room.winner = { id: winner.id, name: winner.name };
-          room.lastAction = `All other players disconnected. ${winner.name} wins!`;
-        }
-      }
+      // Don't end the game on disconnect - allow reconnection
+      // The player can rejoin and continue playing
       await save(room);
     }
     return { room, disconnectedPlayer: player };

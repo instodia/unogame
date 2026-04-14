@@ -21,6 +21,7 @@ export default function Game() {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const chatEndRef = useRef(null);
   const discardRef = useRef(null);
+  const cardRefs = useRef({});
 
   const myId = sessionStorage.getItem('uno_player_id');
   const me = gameState?.players.find(p => p.id === myId);
@@ -67,7 +68,7 @@ export default function Game() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chat]);
 
-  const handlePlayCard = (card, cardElement) => {
+  const handlePlayCard = (card) => {
     if (!isMyTurn) return;
     
     if (card.color === 'wild') {
@@ -76,31 +77,53 @@ export default function Game() {
       return;
     }
     
-    const rect = cardElement.getBoundingClientRect();
-    const discardRect = discardRef.current?.getBoundingClientRect();
+    const cardEl = cardRefs.current[card.id];
+    const discardEl = discardRef.current;
     
-    if (rect && discardRect) {
-      const deltaX = discardRect.left + discardRect.width / 2 - rect.left - rect.width / 2;
-      const deltaY = discardRect.top + discardRect.height / 2 - rect.top - rect.height / 2;
+    if (cardEl && discardEl) {
+      const cardRect = cardEl.getBoundingClientRect();
+      const discardRect = discardEl.getBoundingClientRect();
+      
+      const deltaX = discardRect.left + discardRect.width / 2 - cardRect.left - cardRect.width / 2;
+      const deltaY = discardRect.top + discardRect.height / 2 - cardRect.top - cardRect.height / 2;
       
       setAnimatingCard({
         card,
-        startX: rect.left,
-        startY: rect.top,
-        deltaX,
-        deltaY,
-        rotation: Math.random() * 20 - 10,
+        id: `anim-${Date.now()}`,
+        style: {
+          position: 'fixed',
+          top: cardRect.top,
+          left: cardRect.left,
+          width: cardRect.width,
+          height: cardRect.height,
+          zIndex: 1000,
+          transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+        }
+      });
+      
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setAnimatingCard(prev => prev ? {
+            ...prev,
+            style: {
+              ...prev.style,
+              top: discardRect.top,
+              left: discardRect.left,
+              transform: 'scale(0.8) rotate(15deg)',
+              opacity: 0.8,
+            }
+          } : null);
+        });
       });
       
       setTimeout(() => {
         socket.emit('play_card', { cardId: card.id }, (res) => {
           if (res?.error) {
             setError(res.error);
-            setAnimatingCard(null);
           }
         });
         setAnimatingCard(null);
-      }, 400);
+      }, 380);
     } else {
       socket.emit('play_card', { cardId: card.id }, (res) => {
         if (res?.error) setError(res.error);
@@ -245,14 +268,15 @@ export default function Game() {
             <div 
               key={card.id} 
               className="card-wrapper"
-              style={{ animationDelay: `${index * 50}ms` }}
+              style={{ animationDelay: `${index * 30}ms` }}
+              ref={el => cardRefs.current[card.id] = el}
             >
               <Card
                 card={card}
                 isValid={isMyTurn && me.validCards?.includes(card.id)}
-                onClick={(e) => {
+                onClick={() => {
                   if (isMyTurn && me.validCards?.includes(card.id)) {
-                    handlePlayCard(card, e.currentTarget.querySelector('.card'));
+                    handlePlayCard(card);
                   }
                 }}
               />
@@ -268,16 +292,7 @@ export default function Game() {
       </div>
 
       {animatingCard && (
-        <div 
-          className="animating-card"
-          style={{
-            '--start-x': `${animatingCard.startX}px`,
-            '--start-y': `${animatingCard.startY}px`,
-            '--delta-x': `${animatingCard.deltaX}px`,
-            '--delta-y': `${animatingCard.deltaY}px`,
-            '--rotation': `${animatingCard.rotation}deg`,
-          }}
-        >
+        <div style={animatingCard.style} className="animating-card-wrapper">
           <Card card={animatingCard.card} />
         </div>
       )}
