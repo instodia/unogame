@@ -225,6 +225,60 @@ export async function drawCard(code, playerId) {
   return { room, drawnCard };
 }
 
+// ─── LEAVE GAME (voluntary exit) ─────────────────────────────────────────────
+export async function leaveGame(code, playerId) {
+  const room = await getRoom(code);
+  if (!room) return { error: 'Room not found' };
+
+  const playerIndex = room.players.findIndex(p => p.id === playerId);
+  if (playerIndex === -1) return { error: 'Player not found' };
+
+  const player = room.players[playerIndex];
+  const playerName = player.name;
+  const wasCurrentPlayer = playerIndex === room.currentPlayerIndex;
+
+  room.players.splice(playerIndex, 1);
+
+  if (room.players.length === 0) {
+    await deleteRoom(code);
+    return { room: null, playerName, roomDeleted: true };
+  }
+
+  if (room.status === 'lobby') {
+    if (room.hostId === playerId) {
+      room.hostId = room.players[0].id;
+    }
+    await saveRoom(room);
+    return { room, playerName, roomDeleted: false };
+  }
+
+  if (room.status === 'playing') {
+    if (room.players.length === 1) {
+      room.status = 'finished';
+      room.winner = { id: room.players[0].id, name: room.players[0].name };
+      room.lastAction = `${playerName} left. ${room.players[0].name} wins!`;
+      await saveRoom(room);
+      return { room, playerName, roomDeleted: false };
+    }
+
+    if (wasCurrentPlayer) {
+      const n = room.players.length;
+      room.currentPlayerIndex = (((room.currentPlayerIndex) % n) + n) % n;
+    }
+
+    if (room.hostId === playerId) {
+      room.hostId = room.players[0].id;
+    }
+
+    room.lastAction = `${playerName} left the game.`;
+    await saveRoom(room);
+    return { room, playerName, roomDeleted: false };
+  }
+
+  await saveRoom(room);
+  return { room, playerName, roomDeleted: false };
+}
+
 // ─── DISCONNECT PLAYER ────────────────────────────────────────────────────────
 export async function disconnectPlayer(socketId) {
   const { getAllRooms, saveRoom: save, deleteRoom: del } = await import('./store.js');
@@ -240,10 +294,17 @@ export async function disconnectPlayer(socketId) {
     if (!anyConnected) {
       await del(room.code);
     } else {
-      // If game in lobby and host left, assign new host
       if (room.status === 'lobby' && room.hostId === player.id) {
         const newHost = room.players.find(p => p.connected);
         if (newHost) room.hostId = newHost.id;
+      }
+      if (room.status === 'playing' && room.players.filter(p => p.connected).length === 1) {
+        room.status = 'finished';
+        const winner = room.players.find(p => p.connected);
+        if (winner) {
+          room.winner = { id: winner.id, name: winner.name };
+          room.lastAction = `All other players disconnected. ${winner.name} wins!`;
+        }
       }
       await save(room);
     }

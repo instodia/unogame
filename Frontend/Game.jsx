@@ -17,7 +17,10 @@ export default function Game() {
   const [chat, setChat] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [showChat, setShowChat] = useState(false);
+  const [animatingCard, setAnimatingCard] = useState(null);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const chatEndRef = useRef(null);
+  const discardRef = useRef(null);
 
   const myId = sessionStorage.getItem('uno_player_id');
   const me = gameState?.players.find(p => p.id === myId);
@@ -39,12 +42,16 @@ export default function Game() {
     socket.on('player_disconnected', ({ playerName }) => {
       setChat(prev => [...prev, { playerName: '🔌 System', message: `${playerName} disconnected`, ts: Date.now() }]);
     });
-
-    // Rejoin
-    const pid = sessionStorage.getItem('uno_player_id');
-    if (pid) socket.emit('rejoin_room', { code, playerId: pid }, (res) => {
-      if (res?.error) navigate('/');
+    socket.on('player_left', ({ playerName }) => {
+      setChat(prev => [...prev, { playerName: '🔌 System', message: `${playerName} left the game`, ts: Date.now() }]);
     });
+
+    const pid = sessionStorage.getItem('uno_player_id');
+    if (pid) {
+      socket.emit('rejoin_room', { code, playerId: pid }, (res) => {
+        if (res?.error) navigate('/');
+      });
+    }
 
     return () => {
       socket.off('connect', handleConnect);
@@ -52,6 +59,7 @@ export default function Game() {
       socket.off('lobby_state');
       socket.off('chat_message');
       socket.off('player_disconnected');
+      socket.off('player_left');
     };
   }, [code, navigate]);
 
@@ -59,16 +67,45 @@ export default function Game() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chat]);
 
-  const handlePlayCard = (card) => {
+  const handlePlayCard = (card, cardElement) => {
     if (!isMyTurn) return;
+    
     if (card.color === 'wild') {
       setPendingCard(card);
       setShowColorPicker(true);
       return;
     }
-    socket.emit('play_card', { cardId: card.id }, (res) => {
-      if (res?.error) setError(res.error);
-    });
+    
+    const rect = cardElement.getBoundingClientRect();
+    const discardRect = discardRef.current?.getBoundingClientRect();
+    
+    if (rect && discardRect) {
+      const deltaX = discardRect.left + discardRect.width / 2 - rect.left - rect.width / 2;
+      const deltaY = discardRect.top + discardRect.height / 2 - rect.top - rect.height / 2;
+      
+      setAnimatingCard({
+        card,
+        startX: rect.left,
+        startY: rect.top,
+        deltaX,
+        deltaY,
+        rotation: Math.random() * 20 - 10,
+      });
+      
+      setTimeout(() => {
+        socket.emit('play_card', { cardId: card.id }, (res) => {
+          if (res?.error) {
+            setError(res.error);
+            setAnimatingCard(null);
+          }
+        });
+        setAnimatingCard(null);
+      }, 400);
+    } else {
+      socket.emit('play_card', { cardId: card.id }, (res) => {
+        if (res?.error) setError(res.error);
+      });
+    }
   };
 
   const handleColorChosen = (color) => {
@@ -83,6 +120,15 @@ export default function Game() {
   const handleDraw = () => {
     socket.emit('draw_card', {}, (res) => {
       if (res?.error) setError(res.error);
+    });
+  };
+
+  const handleExit = () => {
+    socket.emit('leave_game', {}, () => {
+      sessionStorage.removeItem('uno_player_id');
+      sessionStorage.removeItem('uno_room_code');
+      sessionStorage.removeItem('uno_player_name');
+      navigate('/');
     });
   };
 
@@ -123,7 +169,27 @@ export default function Game() {
     <div className="game">
       {showColorPicker && <ColorPicker onSelect={handleColorChosen} />}
 
-      {/* Opponents */}
+      {showExitConfirm && (
+        <div className="exit-confirm-overlay">
+          <div className="exit-confirm">
+            <h3>Leave Game?</h3>
+            <p>Are you sure you want to leave? Your progress will be lost.</p>
+            <div className="exit-confirm-buttons">
+              <button className="btn-cancel" onClick={() => setShowExitConfirm(false)}>Cancel</button>
+              <button className="btn-exit-confirm" onClick={handleExit}>Leave</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <button className="exit-btn" onClick={() => setShowExitConfirm(true)} title="Exit Game">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
+
       <div className="opponents-area">
         {opponents.map(opp => (
           <div key={opp.id} className={`opponent ${opp.isCurrent ? 'active-player' : ''}`}>
@@ -133,29 +199,22 @@ export default function Game() {
               {opp.cardCount === 1 && <span className="uno-badge">UNO!</span>}
               {!opp.connected && <span className="dc-badge">OFFLINE</span>}
             </div>
-            <div className="opp-cards">
-              {Array.from({ length: Math.min(opp.cardCount, 12) }).map((_, i) => (
-                <div key={i} className="card face-down opp-card" />
-              ))}
-              {opp.cardCount > 12 && <span className="card-overflow">+{opp.cardCount - 12}</span>}
+            <div className="opp-cards-count">
+              <span className="card-count">{opp.cardCount}</span>
+              <span className="card-label">cards</span>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Center Board */}
       <div className="board">
-        {/* Color indicator */}
         <div className="color-indicator" style={{ background: COLOR_BG[currentColor] }}>
           <span>{currentColor?.toUpperCase()}</span>
         </div>
 
-        {/* Action log */}
         <div className="action-log">{gameState.lastAction}</div>
 
-        {/* Piles */}
         <div className="piles">
-          {/* Draw pile */}
           <div className="pile-area">
             <div
               className={`card face-down draw-pile ${isMyTurn ? 'valid' : ''}`}
@@ -167,31 +226,37 @@ export default function Game() {
             <span className="pile-label">Draw</span>
           </div>
 
-          {/* Discard pile */}
-          <div className="pile-area">
+          <div className="pile-area" ref={discardRef}>
             <Card card={topCard} size="large" />
             <span className="pile-label">Discard</span>
           </div>
         </div>
 
-        {/* Turn indicator */}
         <div className={`turn-indicator ${isMyTurn ? 'your-turn' : ''}`}>
           {isMyTurn ? '⚡ YOUR TURN' : `${currentPlayerName}'s turn`}
         </div>
       </div>
 
-      {/* My Hand */}
       <div className="my-hand-area">
         {me?.cardCount === 1 && <div className="uno-shout">UNO! 🎉</div>}
         {error && <div className="hand-error" onClick={() => setError('')}>{error} ✕</div>}
         <div className="my-hand">
-          {me?.hand?.map(card => (
-            <Card
-              key={card.id}
-              card={card}
-              isValid={isMyTurn && me.validCards?.includes(card.id)}
-              onClick={() => handlePlayCard(card)}
-            />
+          {me?.hand?.map((card, index) => (
+            <div 
+              key={card.id} 
+              className="card-wrapper"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <Card
+                card={card}
+                isValid={isMyTurn && me.validCards?.includes(card.id)}
+                onClick={(e) => {
+                  if (isMyTurn && me.validCards?.includes(card.id)) {
+                    handlePlayCard(card, e.currentTarget.querySelector('.card'));
+                  }
+                }}
+              />
+            </div>
           ))}
         </div>
         <div className="hand-info">
@@ -202,9 +267,27 @@ export default function Game() {
         </div>
       </div>
 
-      {/* Chat panel */}
+      {animatingCard && (
+        <div 
+          className="animating-card"
+          style={{
+            '--start-x': `${animatingCard.startX}px`,
+            '--start-y': `${animatingCard.startY}px`,
+            '--delta-x': `${animatingCard.deltaX}px`,
+            '--delta-y': `${animatingCard.deltaY}px`,
+            '--rotation': `${animatingCard.rotation}deg`,
+          }}
+        >
+          <Card card={animatingCard.card} />
+        </div>
+      )}
+
       {showChat && (
         <div className="chat-panel">
+          <div className="chat-header">
+            <span>Chat</span>
+            <button className="chat-close" onClick={() => setShowChat(false)}>×</button>
+          </div>
           <div className="chat-msgs">
             {chat.map((m, i) => (
               <div key={i} className="chat-msg">

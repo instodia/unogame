@@ -5,8 +5,9 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import {
   createRoom, joinRoom, rejoinRoom,
-  startGame, playCard, drawCard, disconnectPlayer
+  startGame, playCard, drawCard, disconnectPlayer, leaveGame
 } from './roomManager.js';
+import { getRoom } from './store.js';
 import { getValidCards } from './gameLogic.js';
 
 const app = express();
@@ -212,6 +213,41 @@ io.on('connection', (socket) => {
       message: message.trim().slice(0, 200),
       ts: Date.now(),
     });
+  });
+
+  // ── LEAVE GAME ───────────────────────────────────────────────────────────────
+  socket.on('leave_game', async (_, cb) => {
+    try {
+      const { roomCode, playerId } = socket.data || {};
+      if (!roomCode) return cb?.({ error: 'Not in a room' });
+
+      const result = await leaveGame(roomCode, playerId);
+      if (result.error) return cb?.({ error: result.error });
+
+      const { room, playerName, roomDeleted } = result;
+
+      io.to(roomCode).emit('player_left', { playerName });
+
+      if (roomDeleted) {
+        socket.leave(roomCode);
+        socket.data = {};
+        return cb?.({ ok: true });
+      }
+
+      socket.leave(roomCode);
+      socket.data = {};
+
+      if (room.status === 'playing') {
+        emitGameState(room);
+      } else {
+        emitLobbyState(room);
+      }
+
+      cb?.({ ok: true });
+    } catch (e) {
+      console.error('leave_game error:', e);
+      cb?.({ error: 'Server error' });
+    }
   });
 
   // ── DISCONNECT ───────────────────────────────────────────────────────────────

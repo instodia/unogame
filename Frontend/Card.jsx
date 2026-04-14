@@ -29,7 +29,7 @@ export default function Card({ card, onClick, isValid, showFaceDown = false, siz
     <div
       className={`card ${validClass}`}
       data-color={card.color}
-      onClick={isValid ? onClick : undefined}
+      onClick={isClickable ? onClick : undefined}
       style={sizeStyle}
       title={`${card.color} ${card.value}`}
     >
