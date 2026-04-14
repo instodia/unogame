@@ -4,12 +4,17 @@ import socket from './socket';
 import './Home.css';
 
 function generateUserId() {
-  return 'user_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
 }
 
 function getOrCreateUserId() {
   let userId = localStorage.getItem('uno_user_id');
-  if (!userId) {
+  if (!userId || userId.length !== 8) {
     userId = generateUserId();
     localStorage.setItem('uno_user_id', userId);
   }
@@ -91,7 +96,6 @@ export default function Home() {
     <div className="home">
       <div className="home-bg" />
       <div className="user-id-badge">
-        <span className="user-id-label">ID:</span>
         <span className="user-id-value">{userId}</span>
       </div>
       <div className="home-content">

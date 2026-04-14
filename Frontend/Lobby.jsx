@@ -12,28 +12,26 @@ export default function Lobby() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
-  const [rejoining, setRejoining] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [roomNotFound, setRoomNotFound] = useState(false);
-  const hasValidated = useRef(false);
-  const hasRejoined = useRef(false);
+  const socketSetup = useRef(false);
 
   const myId = localStorage.getItem('uno_player_id');
 
   useEffect(() => {
-    if (hasValidated.current) return;
-    hasValidated.current = true;
+    let mounted = true;
 
-    const validateRoom = async () => {
+    const validateAndJoin = async () => {
       try {
         const res = await fetch(`${API_URL}/api/room/${code}`);
         const data = await res.json();
 
+        if (!mounted) return;
+
         if (!data.exists) {
           setRoomNotFound(true);
-          setRejoining(false);
-          setTimeout(() => {
-            navigate('/');
-          }, 3000);
+          setIsLoading(false);
+          setTimeout(() => navigate('/'), 3000);
           return;
         }
 
@@ -42,59 +40,66 @@ export default function Lobby() {
           return;
         }
 
-        attemptRejoin();
+        setupSocket();
       } catch (e) {
         console.error('Room validation error:', e);
-        attemptRejoin();
+        if (mounted) setupSocket();
       }
     };
 
-    const attemptRejoin = () => {
-      const rejoinRoom = () => {
-        const pid = localStorage.getItem('uno_player_id');
-        if (!pid) {
-          setRejoining(false);
-          return;
-        }
-
-        socket.emit('rejoin_room', { code, playerId: pid }, (res) => {
-          setRejoining(false);
-          if (res?.error) {
-            navigate(`/?roomcode=${code}`);
-          }
-        });
-      };
+    const setupSocket = () => {
+      const pid = localStorage.getItem('uno_player_id');
 
       const handleConnect = () => {
-        rejoinRoom();
+        if (!socketSetup.current) {
+          socketSetup.current = true;
+          socket.emit('rejoin_room', { code, playerId: pid }, (res) => {
+            if (!mounted) return;
+            setIsLoading(false);
+            if (res?.error) {
+              setError('Unable to rejoin room. You may need to rejoin.');
+            }
+          });
+        }
+      };
+
+      const handleLobbyState = (state) => {
+        if (!mounted) return;
+        setLobby(state);
+        setIsLoading(false);
+        setError('');
+      };
+
+      const handleGameState = (state) => {
+        if (!mounted) return;
+        if (state.status === 'playing') {
+          navigate(`/game/${code}`);
+        }
       };
 
       socket.on('connect', handleConnect);
-      socket.on('lobby_state', (state) => {
-        setLobby(state);
-        setRejoining(false);
-      });
-      socket.on('game_state', (state) => {
-        if (state.status === 'playing') navigate(`/game/${code}`);
-      });
+      socket.on('lobby_state', handleLobbyState);
+      socket.on('game_state', handleGameState);
 
-      if (!socket.connected) {
-        socket.connect();
+      if (socket.connected) {
+        handleConnect();
       } else {
-        if (!hasRejoined.current) {
-          hasRejoined.current = true;
-          rejoinRoom();
-        }
+        socket.connect();
       }
 
       return () => {
         socket.off('connect', handleConnect);
-        socket.off('lobby_state');
-        socket.off('game_state');
+        socket.off('lobby_state', handleLobbyState);
+        socket.off('game_state', handleGameState);
       };
     };
 
-    validateRoom();
+    validateAndJoin();
+
+    return () => {
+      mounted = false;
+      socketSetup.current = false;
+    };
   }, [code, navigate]);
 
   const handleStart = () => {
@@ -131,23 +136,11 @@ export default function Lobby() {
     );
   }
 
-  if (rejoining) {
+  if (isLoading) {
     return (
       <div className="lobby-loading">
         <div className="loader" />
-        <p>Checking room...</p>
-      </div>
-    );
-  }
-
-  if (error && !lobby) {
-    return (
-      <div className="lobby-error">
-        <div className="lobby-card">
-          <h2>Unable to Join</h2>
-          <p>{error}</p>
-          <button className="btn-primary" onClick={() => navigate('/')}>Go to Home</button>
-        </div>
+        <p>Joining room...</p>
       </div>
     );
   }
